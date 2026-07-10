@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rolling Ice Cream</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* === CUSTOM DISPLAY FONTS === */
+  @font-face {
+    font-family: "Transcity";
+    src: url("fonts/Transcity DEMO.otf") format("opentype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Paula Natalie";
+    src: url("fonts/Paula Natalie.otf") format("opentype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    color: #1d1d1f;
+    font-family: -apple-system, BlinkMacFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    font-weight: 700;
+  }
+
+  /* Body background — Mac Big Sur style.
+     High-key, soft, multi-hue, low-contrast. Whiter than pastel.
+     The cards on top will be frosted white; this is the wallpaper
+     that bleeds through them. */
+  body {
+    background:
+      radial-gradient(ellipse 1400px 1000px at 12% 8%,  rgba(255 210 230 / 0.45), transparent 65%),
+      radial-gradient(ellipse 1200px 900px  at 92% 14%, rgba(210 225 255 / 0.42), transparent 65%),
+      radial-gradient(ellipse 1000px 800px  at 50% 50%, rgba(225 210 255 / 0.32), transparent 68%),
+      radial-gradient(ellipse 900px 800px   at 16% 88%, rgba(210 245 225 / 0.35), transparent 65%),
+      radial-gradient(ellipse 1100px 800px  at 88% 92%, rgba(255 220 200 / 0.35), transparent 65%),
+      radial-gradient(ellipse 700px 500px   at 50% 100%, rgba(255 235 215 / 0.40), transparent 70%),
+      linear-gradient(180deg, #fdfcff 0%, #fafaff 50%, #fdfaff 100%);
+    background-color: #fafaff;
+  }
+
+  /* ============================================================
+     THE FIXED SCROLL CONTAINER.
+     This is the only thing the user ever scrolls. It contains:
+       1. The morph stage (sticky inside, visible while in the top)
+       2. The body sections (below the spacer, in document order)
+     The container's scrollTop drives the morph AND reveals the body
+     naturally — no display:none, no class swaps, no opacity tricks.
+     ============================================================ */
+  .stage {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scroll-behavior: auto; /* user-driven, not smooth — smooth makes bidirectional scrub feel laggy */
+  }
+
+  /* === STAGE 1: the morph. Sticky inside the scrolling container. === */
+  .morph {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    height: 100vh;
+    background: #0a0a0a;
+    overflow: hidden;
+  }
+  .morph-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    will-change: transform;
+  }
+  .morph::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(10,10,10,0.4), transparent 30%);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .morph-title {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    z-index: 4;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .morph-title-text {
+    font-family: "Paula Natalie", "Transcity", -apple-system, BlinkMacFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    font-weight: 400;
+    font-size: clamp(56px, 9.5vw, 180px);
+    /* line-height 1.3 — script fonts have big descenders (Paula's "g"
+       drops well below the baseline). With line-height 1 they'd get
+       clipped by the morph's overflow:hidden. */
+    line-height: 1.3;
+    letter-spacing: 0;
+    background: linear-gradient(120deg, #ff4d6d 0%, #7e6dff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    text-shadow: 0 0 60px rgba(255, 255, 255, 0.4);
+    margin: 0;
+    padding: 0.15em 0;
+  }
+  .morph-beat {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 5;
+    transition: opacity 0.4s ease;
+  }
+  .morph-beat-line {
+    font-family: "Transcity", -apple-system, BlinkMacFont, 'SF Pro Display', sans-serif;
+    font-weight: 400;
+    font-size: clamp(32px, 4.4vw, 72px);
+    line-height: 1.05;
+    letter-spacing: 0;
+    text-shadow: 0 2px 18px rgba(255, 255, 255, 0.5);
+    margin: 0;
+  }
+  .word-s0 { background: linear-gradient(120deg, #ff4d6d, #c62368); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+  .word-s1 { background: linear-gradient(120deg, #ff7e29, #c64a1e); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+  .word-s2 { background: linear-gradient(120deg, #ff5e8a, #7c2a6c); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+  .word-s3 { background: linear-gradient(120deg, #4d8eff, #1c4dc6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+  .word-s4 { background: linear-gradient(120deg, #5ed4a0, #1c8c5e); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+  .word-s5 { background: linear-gradient(120deg, #7e6dff, #4c2dc6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+  .word-s6 { background: linear-gradient(120deg, #3ec0ff, #1c6dc6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+  .word-s7 { background: linear-gradient(120deg, #ff9a3c, #c64a1e); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+
+  /* The spacer sits between the morph and the body. It is 1300vh —
+     the user scrolls through it to drive the morph. When the morph
+     is at 100%, the body is naturally at the top of the viewport. */
+  .spacer {
+    position: relative;
+    width: 100%;
+    height: 1300vh;
+    pointer-events: none;
+  }
+
+  /* === STAGE 2: the body. Sits in normal flow INSIDE the fixed
+     container, below the spacer. The user reaches it by scrolling
+     the container past the spacer. There is no display:none — the
+     body is always present, just off-screen until the user scrolls
+     there. Scrolling back up = body scrolls off + morph scrubs back.
+
+     IMPORTANT: the body has an OPAQUE background (the Big Sur
+     wallpaper) so that as the body scrolls UP into view, it covers
+     the sticky morph underneath. The frosted glass cards on top of
+     the body use backdrop-filter, which blurs whatever is IMMEDIATELY
+     behind them — since the wallpaper is now inside the body, the
+     cards blur the wallpaper correctly. */
+  .body {
+    position: relative;
+    background:
+      radial-gradient(ellipse 1400px 1000px at 12% 8%,  rgba(255 210 230 / 0.45), transparent 65%),
+      radial-gradient(ellipse 1200px 900px  at 92% 14%, rgba(210 225 255 / 0.42), transparent 65%),
+      radial-gradient(ellipse 1000px 800px  at 50% 50%, rgba(225 210 255 / 0.32), transparent 68%),
+      radial-gradient(ellipse 900px 800px   at 16% 88%, rgba(210 245 225 / 0.35), transparent 65%),
+      radial-gradient(ellipse 1100px 800px  at 88% 92%, rgba(255 220 200 / 0.35), transparent 65%),
+      radial-gradient(ellipse 700px 500px   at 50% 100%, rgba(255 235 215 / 0.40), transparent 70%),
+      linear-gradient(180deg, #fdfcff 0%, #fafaff 50%, #fdfaff 100%);
+    background-color: #fafaff;
+    padding: 0;
+  }
+  /* Soft top-edge fade so the body's top edge doesn't draw a hard
+     line against the black morph as it scrolls into view. The fade
+     is inside the body, so the morph underneath is covered by the
+     body's full opacity except for this top strip. */
+  .body::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 80px;
+    background: linear-gradient(180deg, rgba(250, 250, 255, 1) 0%, rgba(250, 250, 255, 0) 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* All body content must sit above the body's ::before fade strip */
+  .body > * { position: relative; z-index: 1; }
+
+  /* === SERVICES === */
+  .services { padding: 14vh 7vw 10vh; }
+  .services-head {
+    max-width: 720px; margin: 0 auto 8vh; text-align: center;
+  }
+  .services-eyebrow {
+    font-weight: 700; font-size: 13px; letter-spacing: 0.4em;
+    text-transform: uppercase; color: #c9a558; margin-bottom: 18px;
+  }
+  .services-title {
+    font-family: "Transcity", -apple-system, BlinkMacFont, 'SF Pro Display', sans-serif;
+    font-weight: 400; font-size: clamp(48px, 6.5vw, 96px);
+    line-height: 1; margin: 0 0 16px; color: #1d1d1f; letter-spacing: 0;
+  }
+  .services-sub {
+    font-weight: 500; font-size: 18px; line-height: 1.5;
+    color: rgba(60, 60, 67, 0.78); max-width: 540px; margin: 0 auto;
+  }
+  .tiles {
+    display: flex; flex-direction: column; gap: 22px;
+    max-width: 1180px; margin: 0 auto;
+  }
+  @media (max-width: 700px) { .tiles { gap: 16px; } }
+  /* Mac Big Sur frosted-glass tile.
+     White-translucent fill, very large radius, soft hairline border,
+     a top-edge sheen, and a tinted color glow that bleeds THROUGH the
+     glass from the wallpaper. Headline & body are dark, not white —
+     the cards sit ON the wallpaper, not IN it. */
+  .tile {
+    position: relative;
+    width: 100%;
+    min-height: 72vh;
+    border-radius: 28px;
+    overflow: hidden;
+    color: #1d1d1f;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.9) inset,
+      0 30px 60px -30px rgba(80, 70, 130, 0.18),
+      0 8px 24px -10px rgba(80, 70, 130, 0.10);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease;
+    cursor: pointer;
+    display: grid; align-items: end;
+    padding: 56px 56px 52px;
+    text-decoration: none;
+    isolation: isolate;
+  }
+  /* Top-edge sheen — the hallmark of Big Sur glass */
+  .tile::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 18%);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .tile:hover {
+    transform: translateY(-4px);
+    background: rgba(255, 255, 255, 0.68);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.9) inset,
+      0 40px 80px -30px rgba(80, 70, 130, 0.25),
+      0 12px 30px -10px rgba(80, 70, 130, 0.14);
+  }
+  @media (max-width: 700px) {
+    .tile { min-height: 60vh; padding: 36px 28px 32px; border-radius: 22px; }
+  }
+  .tile-inner { position: relative; z-index: 3; max-width: 720px; }
+  .tile-eyebrow {
+    font-weight: 700; font-size: 12px; letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: #b8923f; /* dimmer gold for restraint on the light surface */
+    margin-bottom: 18px;
+  }
+  .tile-headline {
+    font-family: "Transcity", -apple-system, BlinkMacFont, 'SF Pro Display', sans-serif;
+    font-weight: 400;
+    font-size: clamp(44px, 6.4vw, 96px);
+    line-height: 0.96;
+    letter-spacing: 0;
+    margin: 0 0 18px;
+    color: #1d1d1f;
+  }
+  .tile-sub {
+    font-weight: 500; font-size: 18px; line-height: 1.5;
+    color: rgba(60, 60, 67, 0.78);
+    max-width: 540px;
+    margin: 0 0 28px;
+  }
+  .tile-cta {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 13px; letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #1d1d1f;
+    padding: 12px 22px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 999px;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 2px 6px rgba(80, 70, 130, 0.06);
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .tile-cta:hover { background: rgba(255, 255, 255, 0.9); transform: translateX(2px); }
+  .tile-cta .arrow { display: inline-block; transition: transform 0.2s ease; }
+  .tile-cta:hover .arrow { transform: translateX(4px); }
+  /* Tinted color blob per tile. Sits BEHIND the glass (z-index 0)
+     and bleeds through via the backdrop-filter. This is the only
+     color the tile "owns" — pink for flavor, purple for rep, mint for
+     event. Subtle. */
+  .tile-glow {
+    position: absolute;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.55;
+  }
+  .tile-flavor .tile-glow {
+    width: 600px; height: 600px;
+    top: -180px; right: -160px;
+    background: radial-gradient(circle, rgba(255 140 200 / 0.85), transparent 70%);
+  }
+  .tile-rep .tile-glow {
+    width: 700px; height: 700px;
+    bottom: -200px; left: -160px;
+    background: radial-gradient(circle, rgba(170 150 255 / 0.75), transparent 70%);
+  }
+  .tile-event .tile-glow {
+    width: 650px; height: 650px;
+    top: 5%; right: -150px;
+    background: radial-gradient(circle, rgba(140 230 200 / 0.75), transparent 70%);
+  }
+
+  /* === VISIT === */
+  .visit { padding: 6vh 7vw 8vh; }
+  .visit-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 28px;
+    max-width: 980px; margin: 0 auto;
+  }
+  @media (max-width: 720px) { .visit-grid { grid-template-columns: 1fr; } }
+  .visit-card {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 22px;
+    padding: 36px 32px;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.9) inset,
+      0 20px 40px -20px rgba(80, 70, 130, 0.12),
+      0 4px 12px -4px rgba(80, 70, 130, 0.06);
+    color: #1d1d1f;
+    position: relative; overflow: hidden;
+  }
+  .visit-card::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, transparent 22%);
+    pointer-events: none;
+  }
+  .visit-card h3 {
+    position: relative; z-index: 2;
+    font-weight: 800; font-size: 28px; margin: 0 0 12px;
+  }
+  .visit-card p {
+    position: relative; z-index: 2;
+    font-weight: 500; font-size: 16px; line-height: 1.6;
+    color: rgba(60, 60, 67, 0.78); margin: 0 0 8px;
+  }
+  .visit-card a {
+    position: relative; z-index: 2;
+    color: #c9a558; text-decoration: none;
+    border-bottom: 1px solid #c9a558; padding-bottom: 4px;
+  }
+
+  /* === BOOKING === */
+  .booking { padding: 8vh 7vw 12vh; }
+  .booking-head {
+    max-width: 720px; margin: 0 auto 6vh; text-align: center;
+  }
+  .booking-eyebrow {
+    font-weight: 700; font-size: 13px; letter-spacing: 0.4em;
+    text-transform: uppercase; color: #c9a558; margin-bottom: 18px;
+  }
+  .booking-title {
+    font-family: "Transcity", -apple-system, BlinkMacFont, 'SF Pro Display', sans-serif;
+    font-weight: 400; font-size: clamp(48px, 6.5vw, 96px);
+    line-height: 1; margin: 0 0 16px; letter-spacing: 0;
+  }
+  .booking-sub {
+    font-weight: 500; font-size: 18px; line-height: 1.5;
+    color: rgba(60, 60, 67, 0.78); max-width: 540px; margin: 0 auto;
+  }
+  .booking-form {
+    max-width: 640px; margin: 6vh auto 0;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 22px; padding: 36px;
+    position: relative; overflow: hidden;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.9) inset,
+      0 24px 48px -20px rgba(80, 70, 130, 0.12),
+      0 4px 12px -4px rgba(80, 70, 130, 0.06);
+  }
+  .booking-form::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, transparent 22%);
+    pointer-events: none;
+  }
+  @media (max-width: 600px) { .booking-form { grid-template-columns: 1fr; } }
+  .booking-form input,
+  .booking-form select,
+  .booking-form textarea {
+    position: relative; z-index: 2;
+    width: 100%; padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(201, 165, 88, 0.28);
+    border-radius: 10px; color: #1d1d1f;
+    font-family: inherit; font-weight: 500; font-size: 14px;
+    backdrop-filter: blur(10px);
+  }
+  .booking-form input::placeholder,
+  .booking-form textarea::placeholder { color: rgba(29, 29, 31, 0.42); }
+  .booking-form input:focus,
+  .booking-form select:focus,
+  .booking-form textarea:focus {
+    outline: none; border-color: #c9a558;
+    background: rgba(255, 255, 255, 0.75);
+  }
+  .booking-form textarea { min-height: 120px; resize: vertical; grid-column: span 2; }
+  .booking-form select option { color: #1d1d1f; }
+  .booking-submit {
+    position: relative; z-index: 2;
+    grid-column: span 2; padding: 14px 24px;
+    background: #c9a558; color: #0a0a0a;
+    border: 0; border-radius: 999px;
+    font-family: inherit; font-weight: 800;
+    font-size: 13px; letter-spacing: 0.3em; text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .booking-submit:hover { background: #d6b76b; transform: translateY(-1px); }
+
+  .footer {
+    padding: 32px 24px; text-align: center;
+    font-weight: 700; font-size: 11px; letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(29, 29, 31, 0.5);
+  }
+</style>
+</head>
+<body>
+
+<!-- THE FIXED SCROLL CONTAINER. Everything lives inside this. -->
+<div class="stage" id="stage">
+
+  <!-- The morph stage. Sticky inside the container. -->
+  <section class="morph" id="morph">
+    <img id="frame" class="morph-img" src="frames/frame_0001.png" alt="" />
+    <div class="morph-title" id="title">
+      <h1 class="morph-title-text">Rolling Ice Cream</h1>
+    </div>
+    <!-- 6 beats. Each at alternating left/right. Faded in by JS based on t. -->
+    <section class="morph-beat" data-in="12" data-out="22" id="b1"
+             style="left: 6vw; right: auto; top: 25vh; width: 36vw;">
+      <p class="morph-beat-line">A surface. Cold.</p>
+    </section>
+    <section class="morph-beat" data-in="26" data-out="36" id="b2"
+             style="right: 6vw; left: auto; top: 65vh; width: 36vw;">
+      <p class="morph-beat-line">A pour.</p>
+    </section>
+    <section class="morph-beat" data-in="40" data-out="50" id="b3"
+             style="left: 6vw; right: auto; top: 30vh; width: 36vw;">
+      <p class="morph-beat-line">A roll.</p>
+    </section>
+    <section class="morph-beat" data-in="54" data-out="64" id="b4"
+             style="right: 6vw; left: auto; top: 65vh; width: 36vw;">
+      <p class="morph-beat-line">You watch the whole thing.</p>
+    </section>
+    <section class="morph-beat" data-in="68" data-out="78" id="b5"
+             style="left: 6vw; right: auto; top: 30vh; width: 36vw;">
+      <p class="morph-beat-line">It's already done.</p>
+    </section>
+    <section class="morph-beat" data-in="82" data-out="92" id="b6"
+             style="right: 6vw; left: auto; top: 65vh; width: 36vw;">
+      <p class="morph-beat-line">That's all a flavor is.</p>
+    </section>
+  </section>
+
+  <!-- The scroll spacer. Drives the morph. -->
+  <div class="spacer" id="spacer"></div>
+
+  <!-- The body. Sits in normal flow below the spacer. No display:none.
+       The user reaches it by scrolling the .stage container past the
+       spacer. Scrolling back up reverses the morph. -->
+  <div class="body" id="body">
+
+    <section class="services">
+      <div class="services-head">
+        <div class="services-eyebrow">What we offer</div>
+        <h2 class="services-title">Services</h2>
+        <p class="services-sub">Three ways to work with us. Pick the one that fits.</p>
+      </div>
+      <div class="tiles">
+        <a class="tile tile-flavor" href="#flavors">
+          <span class="tile-glow"></span>
+          <div class="tile-inner">
+            <div class="tile-eyebrow">The menu</div>
+            <h3 class="tile-headline">Flavor.</h3>
+            <p class="tile-sub">Four flavors that change with the season. Real fruit. Small batch. Picked, rolled, and frozen the day you take them home.</p>
+            <span class="tile-cta">See the menu <span class="arrow">→</span></span>
+          </div>
+        </a>
+        <a class="tile tile-rep" href="#rep">
+          <span class="tile-glow"></span>
+          <div class="tile-inner">
+            <div class="tile-eyebrow">Partner with us</div>
+            <h3 class="tile-headline">Run a cart<br />in your city.</h3>
+            <p class="tile-sub">We supply the cold-plate system, the recipe, the brand. You supply the neighborhood. Royalty-based. No franchise fee up front.</p>
+            <span class="tile-cta">Become a rep <span class="arrow">→</span></span>
+          </div>
+        </a>
+        <a class="tile tile-event" href="#booking">
+          <span class="tile-glow"></span>
+          <div class="tile-inner">
+            <div class="tile-eyebrow">Catering &amp; events</div>
+            <h3 class="tile-headline">Book us for<br />your next event.</h3>
+            <p class="tile-sub">Weddings, brand activations, corporate, birthdays. We show up, we set the plate, we roll. Miami-Dade and Broward. We travel.</p>
+            <span class="tile-cta">Book the cart <span class="arrow">→</span></span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <section class="visit">
+      <div class="visit-grid">
+        <article class="visit-card">
+          <h3>Where to find us</h3>
+          <p>Wynwood, Miami</p>
+          <p>Sat &mdash; Sun, 12&ndash;6</p>
+          <p>Or by appointment.</p>
+        </article>
+        <article class="visit-card">
+          <h3>Get the next drop</h3>
+          <p>One text when there's something new. No marketing.</p>
+          <p><a href="#booking">Sign up for the next flavor</a></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="booking" id="booking">
+      <div class="booking-head">
+        <div class="booking-eyebrow">Get in touch</div>
+        <h2 class="booking-title">Book a cart</h2>
+        <p class="booking-sub">Tell us about the event, the date, and how many people. We'll get back within 24 hours.</p>
+      </div>
+      <form class="booking-form" onsubmit="event.preventDefault(); alert('Thanks — we will be in touch.');">
+        <input type="text" name="name" placeholder="Name" required />
+        <input type="email" name="email" placeholder="Email" required />
+        <input type="tel" name="phone" placeholder="Phone" />
+        <select name="service">
+          <option value="cart">The cart (catering)</option>
+          <option value="menu">The menu (pickup)</option>
+          <option value="partner">Partner / franchise</option>
+          <option value="other">Something else</option>
+        </select>
+        <input type="date" name="date" />
+        <input type="number" name="guests" placeholder="Approx. guests" min="1" />
+        <textarea name="message" placeholder="Tell us about the event, the venue, anything special."></textarea>
+        <button type="submit" class="booking-submit">Send</button>
+      </form>
+    </section>
+
+    <footer class="footer">&copy; Rolling Ice Cream &mdash; Ray Ally</footer>
+  </div>
+</div>
+
+<script>
+  // === Wrap every beat word in a rainbow-gradient span ===
+  (function sprinkle() {
+    var beats = document.querySelectorAll('.morph-beat-line');
+    for (var i = 0; i < beats.length; i++) {
+      var text = beats[i].textContent.trim();
+      var words = text.split(/\s+/);
+      var out = [];
+      for (var w = 0; w < words.length; w++) {
+        out.push('<span class="word-s' + ((i + w) % 8) + '">' + words[w] + '</span>');
+      }
+      beats[i].innerHTML = out.join(' ');
+    }
+  })();
+
+  // === Drive the morph by listening to the .stage container's scroll ===
+  (function () {
+    var stage = document.getElementById('stage');
+    var morph = document.getElementById('morph');
+    var spacer = document.getElementById('spacer');
+    var img = document.getElementById('frame');
+    var titleEl = document.getElementById('title');
+    var beats = document.querySelectorAll('.morph-beat');
+
+    // Build frame list at runtime — no need to inline 243 strings.
+    var N = 243;
+    var base = 'frames/';
+    function frameSrc(i) {
+      var n = String(i + 1);
+      while (n.length < 4) n = '0' + n;
+      return base + 'frame_' + n + '.png';
+    }
+
+    var lastIdx = -1;
+
+    function update() {
+      // t = how far the user has scrolled through the morph.
+      // 0 = top of page (morph at frame 1), 1 = end of morph (body visible).
+      var morphH = morph.offsetHeight;          // 100vh
+      var stageH = stage.clientHeight;         // viewport
+      var scrollable = morphH - stageH;        // distance morph travels through viewport
+      // We want t to go from 0 to 1 as the user scrolls from
+      // "morph just leaving the top" to "morph just leaving the bottom".
+      // When t = 1, the spacer has scrolled past and the body is at the top.
+      // Total scroll distance = morphH (100vh) + spacer.offsetHeight + bodyHeight.
+      // But we want t to be DONE when the spacer has fully scrolled past,
+      // i.e. when scrollY = morphH + spacer.offsetHeight - stageH.
+      var totalScroll = morphH + spacer.offsetHeight;
+      var sy = stage.scrollTop;
+      var t = Math.max(0, Math.min(1, sy / Math.max(1, totalScroll - stageH)));
+
+      // Update frame
+      var idx = Math.min(N - 1, Math.floor(t * (N - 1)));
+      if (idx !== lastIdx) {
+        img.src = frameSrc(idx);
+        lastIdx = idx;
+      }
+
+      // Subtle pan
+      var pan = Math.round((t - 0.5) * -24);
+      img.style.transform = 'translateY(' + pan + 'px)';
+
+      // Title fade: in 0-2%, hold 2-7%, out 7-10%
+      // (Shifted earlier + held longer per Ray, "not by much")
+      var op = 0;
+      if (t < 0.02) op = t / 0.02;
+      else if (t < 0.07) op = 1;
+      else if (t < 0.10) op = 1 - (t - 0.07) / 0.03;
+      titleEl.style.opacity = String(op);
+
+      // Beats
+      for (var i = 0; i < beats.length; i++) {
+        var b = beats[i];
+        var inP = parseFloat(b.dataset.in) / 100;
+        var outP = parseFloat(b.dataset.out) / 100;
+        var a = 0;
+        if (t >= inP && t < outP) a = 1;
+        else if (t >= outP && t < outP + 0.02) a = Math.max(0, 1 - (t - outP) / 0.02);
+        else if (t >= inP - 0.02 && t < inP) a = Math.max(0, (t - (inP - 0.02)) / 0.02);
+        b.style.opacity = String(a);
+      }
+    }
+
+    stage.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  })();
+</script>
+</body>
+</html>
